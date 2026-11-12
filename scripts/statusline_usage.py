@@ -2,7 +2,7 @@
 """statusline_usage.py - thanh trang thai Claude Code: han muc 5 gio, 7 ngay, Fable, nhip tuan.
 
 Doc JSON statusLine tu stdin (chi truong rate_limits), ghi <cau hinh>/usage-tracker/rate.json,
-in MOT dong ASCII:  Usage 5h 23% | 7d 56% | Fable 17% | 7d time 48% | VANG
+in MOT dong ASCII:  Usage 5h 23% | Fable 17% tong | 7d usage 56% | 7d time 48% | VANG
   --quiet : chi ghi du lieu, khong in gi (de noi vao thanh trang thai co san cua ban)
 Khong doc noi dung hoi thoai, khong goi mang, khong ghi de du lieu cu khi thieu khoa / JSON hong.
 Khong bao gio nem loi ra ngoai (thanh trang thai khong duoc vo).
