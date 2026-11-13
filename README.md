@@ -1,24 +1,23 @@
 # claude-usage-tracker
 
-A Claude Code skill that shows your usage limits right on the status line, together with a weekly pace light and your Fable share. Pure Python 3 standard library, no dependencies, works on Windows, macOS and Linux. MIT licensed.
+A Claude Code skill that shows your 7-day usage limit right on the status line, together with a weekly pace light and your Fable share. Pure Python 3 standard library, no dependencies, works on Windows, macOS and Linux. MIT licensed.
 
 ```text
-Usage 5h 23% | Fable 17% of total | 7d usage 56% | 7d time 48% | YELLOW
+7d Fable usage 17% | 7d usage 56% | 7d time 48% | YELLOW
 ```
 
-That is the line you get with `USAGE_TRACKER_LANG=en`. Without the variable the same line uses the legacy Vietnamese labels (`tong`, `XANH`/`VANG`/`DO`/`DU`) and the per-prompt reminder is in Vietnamese; see [Language](#language).
+Everything it prints is in English. There is no 5-hour field: that limit window no longer exists, so the tracker ignores it if Claude Code still sends it.
 
 ## What the status line shows
 
 | Field | Meaning |
 |---|---|
-| `5h` | Percent of the 5-hour limit used (the real number sent by Claude Code). |
-| `Fable` | `17%`: a real per-model limit, if your Claude Code sends one. `~17%`: an estimate from a `/usage` marker you logged. `17% of total`: Fable's share of this week's usage, computed from your transcripts. |
+| `7d Fable usage` | `17%`: a real per-model limit, if your Claude Code sends one. `~17%`: an estimate from a `/usage` marker you logged. Plain `17%` from the transcripts: Fable's share of this week's usage, computed from your transcripts. |
 | `7d usage` | Percent of the 7-day limit used (the real number). |
 | `7d time` | Percent of the 7-day window that has already elapsed, computed from `seven_day.resets_at`. |
 | light | Weekly pace: `GREEN` on pace, `YELLOW` a little ahead of schedule, `RED` far ahead of schedule, `SPARE` headroom left. |
 
-On every prompt you type, a `UserPromptSubmit` hook adds a one-line reminder with the same numbers (plus a hint to lighten the load when the light is yellow or red, or the 5-hour window is at 75% or more). Numbers appear only after Claude Code has sent `rate_limits`, which requires a login plan that has limits and happens after your first message.
+On every prompt you type, a `UserPromptSubmit` hook adds a one-line reminder with the same numbers (plus a hint to lighten the load when the light is yellow or red, or 7d usage is at 95% or more). Numbers appear only after Claude Code has sent `rate_limits`, which requires a login plan that has limits and happens after your first message.
 
 ## How the pace light works
 
@@ -57,16 +56,6 @@ python3 ~/.claude/skills/theo-doi-usage/scripts/nhip_tuan.py --moc 73 47
 
 Add `--luc "2026-01-15 13:05"` if you read the numbers at another time. `--moc 73` logs the week number only.
 
-## Language
-
-The status line and the reminder have two label sets. For backward compatibility the default is still the Vietnamese one; set `USAGE_TRACKER_LANG=en` for English. The Vietnamese messages live in one file, `scripts/lang_vi.py`.
-
-| | default | `USAGE_TRACKER_LANG=en` |
-|---|---|---|
-| Fable share label | `Fable 17% tong` | `Fable 17% of total` |
-| Pace light | `XANH` / `VANG` / `DO` / `DU` | `GREEN` / `YELLOW` / `RED` / `SPARE` |
-| Reminder and report text | Vietnamese | English |
-
 ## Uninstall safely
 
 `python3 ~/.claude/skills/theo-doi-usage/install.py --uninstall` (add `--dry-run` to preview) only:
@@ -78,9 +67,9 @@ It never touches your config directory. The data in `<config>/usage-tracker/` (`
 
 ## FAQ
 
-**Why does the status line show `-` for 5h or 7d?** Claude Code only sends the windows it knows about. A window that is not open yet (for example the 5-hour window before your first message) shows `-`; the last known value of the other window is kept.
+**Why does the status line show `7d usage -`?** Claude Code only sends the windows it knows about, and only after your first message. Until then the 7-day number shows `-`; the last known value is kept while its window has not expired.
 
-**Why is there no Fable field?** The field appears only if Claude Code sends a per-model limit, you logged a `/usage` marker, or there is at least one Fable turn in this week's transcripts.
+**Why is there no `7d Fable usage` field?** The field appears only if Claude Code sends a per-model limit, you logged a `/usage` marker, or there is at least one Fable turn in this week's transcripts.
 
 **How accurate is the Fable share?** It is an estimate. Usage is converted to weighted tokens (fresh input x1, cache write x1.25, cache read x0.1, output x5), which is not the provider's formula, so the share and the marker-based estimate can be off. A per-model limit key is only used if your Claude Code version sends one with "fable" in its name.
 
@@ -98,7 +87,7 @@ It reads only three fields, `model`, `usage` and `timestamp`, from your transcri
 
 ## Files
 
-`SKILL.md` · `install.py` · `scripts/statusline_usage.py` · `scripts/hook_usage.py` · `scripts/nhip_tuan.py` · `scripts/usage_chung.py` · `scripts/lang_vi.py` · `tests/kiem_thu.py` · `LICENSE`
+`SKILL.md` · `install.py` · `scripts/statusline_usage.py` · `scripts/hook_usage.py` · `scripts/nhip_tuan.py` · `scripts/usage_chung.py` · `tests/kiem_thu.py` · `LICENSE`
 
 ## License
 

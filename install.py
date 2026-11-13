@@ -20,7 +20,7 @@ import sys
 import time
 
 GOC = os.path.dirname(os.path.abspath(__file__))
-TEP_SCRIPT = ("usage_chung.py", "lang_vi.py", "statusline_usage.py", "nhip_tuan.py", "hook_usage.py")
+TEP_SCRIPT = ("usage_chung.py", "statusline_usage.py", "nhip_tuan.py", "hook_usage.py")
 DAU = "usage-tracker"  # marker used to recognise the entries this skill added
 
 
@@ -162,7 +162,7 @@ def go(cfg, dry):
             del hooks["UserPromptSubmit"]
             if not hooks:
                 del st["hooks"]
-    tep_xoa = [os.path.join(bin_dir, t) for t in TEP_SCRIPT if os.path.exists(os.path.join(bin_dir, t))]
+    tep_xoa = [os.path.join(bin_dir, t) for t in TEP_SCRIPT + ("lang_vi.py",) if os.path.exists(os.path.join(bin_dir, t))]
     kq.append("delete %d bin files created by the skill (keeping the data rate.json, moc.jsonl and the config directory)" % len(tep_xoa))
     if dry:
         print("[dry-run] nothing written. Would do:")

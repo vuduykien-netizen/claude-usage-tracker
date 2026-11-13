@@ -7,7 +7,6 @@ Usage:
   python3 nhip_tuan.py --moc 73             week marker only
   python3 nhip_tuan.py --moc 73 47 --luc "2026-01-15 13:05"   marker for a specific local time
   python3 nhip_tuan.py --im                 run silently (only refreshes the cache; called in the background by the hook/status line)
-  USAGE_TRACKER_LANG=en                     print English (the default is the Vietnamese table in lang_vi.py)
 
 The week window comes from seven_day.resets_at (written by statusline_usage.py). If it is missing, the week is
 counted from the most recent Monday 00:00 by the machine clock and the output says it is an estimate.
@@ -28,22 +27,19 @@ import usage_chung as uc  # noqa: E402
 KS = ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens", "output_tokens")
 W = (1.0, 1.25, 0.1, 5.0)
 
-CH = {
-    "vi": uc.lang_vi.NHIP if uc.lang_vi else {},  # vi is only selected when lang_vi.py is present
-    "en": {
-        "tuan": "Week from {a} · {gio:.0f}/168 hours elapsed = {tg:.0f}% of time ({nguon})",
-        "that": "Used {u:.0f}% (real number from the status line, {tuoi} min old) · gap {l:+.0f} pts · light {den}",
-        "uoc": "Estimated used {u:.0f}% (from marker {luc} = {m:.0f}% + usage since) · gap {l:+.0f} pts · light {den}",
-        "none": "No weekly number yet: install the status line (install.py) or log a marker: nhip_tuan.py --moc <week%> [fable%]",
-        "fthat": "Fable: {p:.0f}% (per-model limit sent by Claude Code)",
-        "fuoc": "Fable: est. {p:.0f}% of the Fable week (marker {luc} = {m:.0f}%) · {q:,.0f}k weighted, {r:.0f}% of total",
-        "fty": "Fable: {q:,.0f}k weighted = {r:.0f}% of this week's usage; no Fable % marker yet (read /usage, then: nhip_tuan.py --moc <week%> <fable%>)",
-        "fkhong": "Fable: no Fable-model usage found in transcripts this week",
-        "moc": "Marker saved",
-        "sai": "Numbers must be within 0..100",
-        "est": "estimated from machine clock, no resets_at yet",
-        "rl": "from seven_day.resets_at",
-    },
+S = {
+    "tuan": "Week from {a} · {gio:.0f}/168 hours elapsed = {tg:.0f}% of time ({nguon})",
+    "that": "Used {u:.0f}% (real number from the status line, {tuoi} min old) · gap {l:+.0f} pts · light {den}",
+    "uoc": "Estimated used {u:.0f}% (from marker {luc} = {m:.0f}% + usage since) · gap {l:+.0f} pts · light {den}",
+    "none": "No weekly number yet: install the status line (install.py) or log a marker: nhip_tuan.py --moc <week%> [fable%]",
+    "fthat": "7d Fable usage: {p:.0f}% (per-model limit sent by Claude Code)",
+    "fuoc": "7d Fable usage: est. {p:.0f}% (marker {luc} = {m:.0f}%) · {q:,.0f}k weighted, {r:.0f}% of total usage",
+    "fty": "7d Fable usage: {q:,.0f}k weighted = {r:.0f}% of this week's usage; no Fable % marker yet (read /usage, then: nhip_tuan.py --moc <week%> <fable%>)",
+    "fkhong": "7d Fable usage: no Fable-model usage found in transcripts this week",
+    "moc": "Marker saved",
+    "sai": "Numbers must be within 0..100",
+    "est": "estimated from machine clock, no resets_at yet",
+    "rl": "from seven_day.resets_at",
 }
 
 
@@ -117,8 +113,7 @@ def quy_doi(rows, den=None, chi_fable=False):
 
 
 def chay():
-    ng = uc.ngon_ngu()
-    s = CH[ng]
+    s = S
     now = time.time()
     dl = uc.thu_muc_du_lieu()
     tep_moc = os.path.join(dl, "moc.jsonl")
@@ -171,12 +166,12 @@ def chay():
     if d7 and uc.la_so(d7.get("pct")) and uc.la_so(rate.get("t")) and rate["t"] >= bat_dau:
         uoc = float(d7["pct"])
         l = uoc - tg
-        dong1 = s["that"].format(u=uoc, tuoi=int((now - rate["t"]) / 60), l=l, den=uc.NHAN_DEN[ng][uc.ma_den(uoc, tg)])
+        dong1 = s["that"].format(u=uoc, tuoi=int((now - rate["t"]) / 60), l=l, den=uc.NHAN_DEN[uc.ma_den(uoc, tg)])
     elif mocs and quy_doi(rows, mocs[-1]["t"]) > 0 and mocs[-1]["tuan"] > 0:
         m = mocs[-1]
         mot = quy_doi(rows, m["t"]) / m["tuan"]
         uoc = m["tuan"] + (Q - quy_doi(rows, m["t"])) / mot
-        dong1 = s["uoc"].format(u=uoc, luc=m["luc"], m=m["tuan"], l=uoc - tg, den=uc.NHAN_DEN[ng][uc.ma_den(uoc, tg)])
+        dong1 = s["uoc"].format(u=uoc, luc=m["luc"], m=m["tuan"], l=uoc - tg, den=uc.NHAN_DEN[uc.ma_den(uoc, tg)])
 
     # Fable
     fw = uc.fable_that(rate)

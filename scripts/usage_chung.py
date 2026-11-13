@@ -11,13 +11,9 @@ import subprocess
 import sys
 import time
 
-try:  # Vietnamese message tables; the skill still works (in English) if this file is missing
-    import lang_vi
-except ImportError:
-    lang_vi = None
-
 TUAN_GIAY = 7 * 86400  # seconds in the 7-day window
-CUA_SO_CHINH = ("five_hour", "seven_day")  # the two main rate-limit windows
+CUA_SO_CHINH = ("seven_day",)  # the main rate-limit window
+BO_QUA = ("five_hour",)  # legacy 5-hour window: no longer exists, never stored, never shown
 
 
 def thu_muc_cau_hinh():
@@ -29,13 +25,6 @@ def thu_muc_cau_hinh():
 
 def thu_muc_du_lieu():
     return os.path.join(thu_muc_cau_hinh(), "usage-tracker")
-
-
-def ngon_ngu():
-    v = os.environ.get("USAGE_TRACKER_LANG", "vi").strip().lower()
-    if lang_vi is None:
-        return "en"
-    return "en" if v.startswith("en") else "vi"
 
 
 def la_so(v):
@@ -128,14 +117,7 @@ def ma_den(pct, tg):
     return "G"
 
 
-NHAN_DEN = {
-    "vi": lang_vi.NHAN_DEN if lang_vi else None,
-    "en": {"G": "GREEN", "Y": "YELLOW", "R": "RED", "S": "SPARE"},
-}
-NHAN_DEN_ASCII = {
-    "vi": {"G": "XANH", "Y": "VANG", "R": "DO", "S": "DU"},
-    "en": {"G": "GREEN", "Y": "YELLOW", "R": "RED", "S": "SPARE"},
-}
+NHAN_DEN = {"G": "GREEN", "Y": "YELLOW", "R": "RED", "S": "SPARE"}
 
 
 def doc_rate():
@@ -201,27 +183,25 @@ def lam_moi_nen(now):
 
 
 def dong_ngan(rate, cache, now):
-    """Status-line text (ASCII): Usage 5h X% | Fable Z% | 7d usage Y% | 7d time T% | LIGHT (Fable comes before 7d)"""
-    ng = ngon_ngu()
-    h5 = _pct_hien((rate or {}).get("five_hour"), now)
+    """Status-line text (ASCII): 7d Fable usage Z% | 7d usage Y% | 7d time T% | LIGHT (Fable comes before 7d usage)"""
     d7w = (rate or {}).get("seven_day")
     d7 = _pct_hien(d7w, now)
 
     def p(v):
         return ("%g%%" % round(v, 1)) if v is not None else "-"
 
-    out = "Usage 5h %s" % p(h5)
+    parts = []
     fw = fable_that(rate)
     if fw is not None:
-        out += " | Fable %s" % p(_pct_hien(fw, now))
+        parts.append("7d Fable usage %s" % p(_pct_hien(fw, now)))
     elif cache and cache.get("fable_uoc") is not None:
-        out += " | Fable ~%d%%" % cache["fable_uoc"]
+        parts.append("7d Fable usage ~%d%%" % cache["fable_uoc"])
     elif cache and cache.get("fable_ty_le") is not None:
-        out += " | Fable %d%% %s" % (cache["fable_ty_le"], "tong" if ng == "vi" else "of total")
-    out += " | 7d usage %s" % p(d7)
+        parts.append("7d Fable usage %d%%" % cache["fable_ty_le"])
+    parts.append("7d usage %s" % p(d7))
     tg = phan_tram_tuan_troi((d7w or {}).get("resets"), now)
     if tg is not None:
-        out += " | 7d time %d%%" % tg
+        parts.append("7d time %d%%" % tg)
         if d7 is not None:
-            out += " | %s" % NHAN_DEN_ASCII[ng][ma_den(d7, tg)]
-    return out
+            parts.append(NHAN_DEN[ma_den(d7, tg)])
+    return " | ".join(parts)

@@ -4,13 +4,11 @@
   python3 tests/kiem_thu.py [--tmp <dir>]   run the cases, print PASS/FAIL + a TOTAL line
   python3 tests/kiem_thu.py --pha            set deliberately WRONG expectations: every case must FAIL ("caught N/total")
 
-The default (Vietnamese) locale is exercised on purpose; its expected strings are written as @XXXX
-code points (see vi()) so this file stays English-only.
+Output is English only. The legacy 5-hour window is fed in on purpose to prove it is ignored.
 """
 import datetime
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -25,17 +23,11 @@ KQ = []
 
 def chay(script, cfg, stdin="", args=(), env_them=None):
     env = dict(os.environ)
-    env.update({"CLAUDE_CONFIG_DIR": cfg, "USAGE_TRACKER_NO_REFRESH": "1", "PYTHONUTF8": "1",
-                "USAGE_TRACKER_LANG": "vi"})
+    env.update({"CLAUDE_CONFIG_DIR": cfg, "USAGE_TRACKER_NO_REFRESH": "1", "PYTHONUTF8": "1"})
     env.update(env_them or {})
     p = subprocess.run([sys.executable, script] + list(args), input=stdin.encode("utf-8"),
                        capture_output=True, env=env, timeout=60)
     return p.returncode, p.stdout.decode("utf-8", "replace").strip(), p.stderr.decode("utf-8", "replace").strip()
-
-
-def vi(s):
-    """Decode '@01b0' style code points, so the expected Vietnamese output can be written in ASCII."""
-    return re.sub(r"@([0-9a-f]{4})", lambda m: chr(int(m.group(1), 16)), s)
 
 
 def kiem(ten, thuc, mong):
@@ -57,7 +49,7 @@ def iso(t):
     return datetime.datetime.fromtimestamp(t, datetime.timezone.utc).isoformat()
 
 
-def stdin_rl(h5=None, d7=None, **khac):
+def stdin_rl(h5=None, d7=None, **khac):  # h5 = legacy 5-hour window, must be ignored
     now = time.time()
     rl = {}
     if h5 is not None:
@@ -91,26 +83,26 @@ def main():
     goc_tam = tham_tmp()
     now = time.time()
 
-    # 1) full 5h + 7d
+    # 1) 7d (+ a legacy 5h window that must be ignored)
     c1 = os.path.join(goc_tam, "c1")
     rc, out, _ = dong_tu(c1, h5=23.5, d7=64)
-    kiem("1 full 5h+7d: line", out, "Usage 5h 23.5% | 7d usage 64% | 7d time 50% | DO")
+    kiem("1 line: no 5h, light RED", out, "7d usage 64% | 7d time 50% | RED")
     kiem("1 exit 0", rc, 0)
     r = doc(os.path.join(c1, "usage-tracker", "rate.json"))
-    kiem("1 rate.json: 5h + 7d", (r["five_hour"]["pct"], r["seven_day"]["pct"]), (23.5, 64.0))
+    kiem("1 rate.json: 7d only, 5h not stored", (sorted(r), r["seven_day"]["pct"], r["khac"]), (["khac", "seven_day", "t"], 64.0, {}))
 
     # 2) 7d only (+ resets_at as an ISO string)
     c2 = os.path.join(goc_tam, "c2")
     iso7 = iso(now + 302400)
     rc, out, _ = chay(os.path.join(SC, "statusline_usage.py"), c2,
                       json.dumps({"rate_limits": {"seven_day": {"used_percentage": 50, "resets_at": iso7}}}))
-    kiem("2 7d only: line", out, "Usage 5h - | 7d usage 50% | 7d time 50% | XANH")
-    kiem("2 rate.json five_hour = null", doc(os.path.join(c2, "usage-tracker", "rate.json"))["five_hour"], None)
+    kiem("2 7d only: line", out, "7d usage 50% | 7d time 50% | GREEN")
+    kiem("2 rate.json has no five_hour key", "five_hour" in doc(os.path.join(c2, "usage-tracker", "rate.json")), False)
 
     # 3) separate per-model key
     c3 = os.path.join(goc_tam, "c3")
     rc, out, _ = dong_tu(c3, h5=10, d7=64, seven_day_fable=12)
-    kiem("3 separate Fable key: line", out, "Usage 5h 10% | Fable 12% | 7d usage 64% | 7d time 50% | DO")
+    kiem("3 separate Fable key: line", out, "7d Fable usage 12% | 7d usage 64% | 7d time 50% | RED")
 
     # 4) transcript with Fable -> share
     c4 = os.path.join(goc_tam, "c4")
@@ -129,7 +121,7 @@ def main():
     kiem("4 weighted total / Fable", (ca["quy_doi"], ca["quy_doi_fable"]), (7000, 2000))
     rc, out, _ = dong_tu(c4, h5=23.5, d7=64)
     kiem("4 status line shows the Fable share", out,
-         "Usage 5h 23.5% | Fable 29% tong | 7d usage 64% | 7d time 50% | DO")
+         "7d Fable usage 29% | 7d usage 64% | 7d time 50% | RED")
 
     # 5) /usage marker -> Fable % estimate
     c5 = os.path.join(goc_tam, "c5")
@@ -144,7 +136,9 @@ def main():
     rc, out, _ = chay(os.path.join(SC, "nhip_tuan.py"), c5)
     ca = doc(os.path.join(c5, "usage-tracker", "nhip-cache.json"))
     kiem("5 Fable estimate 20% (marker 10% + usage since)", ca["fable_uoc"], 20)
-    kiem("5 output has the Fable estimate line", vi("Fable: @01b0@1edbc 20%") in out, True)
+    kiem("5 output has the Fable estimate line", "7d Fable usage: est. 20%" in out, True)
+    rc, out, _ = dong_tu(c5, d7=64)
+    kiem("5 status line shows the Fable estimate", out, "7d Fable usage ~20% | 7d usage 64% | 7d time 50% | RED")
     kiem("5 marker outside 0..100 is rejected (code 2)", chay(os.path.join(SC, "nhip_tuan.py"), c5, args=["--moc", "150"])[0], 2)
 
     # 6) broken stdin does not overwrite
@@ -154,14 +148,13 @@ def main():
     kiem("6 broken JSON: prints 'Usage -', exit 0", (rc, out), (0, "Usage -"))
     kiem("6 broken JSON: old file not overwritten", open(p6, "rb").read() == truoc, True)
 
-    # 7) hook
+    # 7) hook (no 5-hour text, English light)
     rc, out, _ = chay(os.path.join(SC, "hook_usage.py"), c1, "{}")
     kiem("7 hook: exit 0, one line, has the numbers",
-         (rc, out.count("\n"), "5h 23.5%" in out, "7d 64%" in out and vi("@0111@00e8n @0110@1ece") in out),
-         (0, 0, True, True))
-    kiem("7 hook en", "light RED" in chay(os.path.join(SC, "hook_usage.py"), c1, "{}", env_them={"USAGE_TRACKER_LANG": "en"})[1], True)
-    kiem("7 hook with no data", chay(os.path.join(SC, "hook_usage.py"), os.path.join(goc_tam, "trong"), "")[1][:11],
-         vi("usage: ch@01b0a"))
+         (rc, out.count("\n"), "5h" in out, "7d usage 64%" in out and "light RED" in out),
+         (0, 0, False, True))
+    kiem("7 hook with no data", chay(os.path.join(SC, "hook_usage.py"), os.path.join(goc_tam, "trong"), "")[1][:15],
+         "usage: no numbe")
 
     # 8) install on fake settings
     c8 = os.path.join(goc_tam, "c8")
@@ -185,7 +178,7 @@ def main():
     chay(ins, c8)
     kiem("8 running again adds no duplicate", len(doc(sp)["hooks"]["UserPromptSubmit"]), 2)
     kiem("8 bin files copied", sorted(os.listdir(os.path.join(c8, "usage-tracker", "bin"))),
-         sorted(["usage_chung.py", "lang_vi.py", "statusline_usage.py", "nhip_tuan.py", "hook_usage.py"]))
+         sorted(["usage_chung.py", "statusline_usage.py", "nhip_tuan.py", "hook_usage.py"]))
     # settings without a statusLine
     c9 = os.path.join(goc_tam, "c9")
     os.makedirs(c9)
@@ -197,7 +190,7 @@ def main():
     cmd = s9["statusLine"]["command"]
     p = subprocess.run(cmd.strip('"').split('" "'), input=stdin_rl(h5=5, d7=50).encode(), capture_output=True, timeout=60,
                        env=dict(os.environ, CLAUDE_CONFIG_DIR=c9, USAGE_TRACKER_NO_REFRESH="1"))
-    kiem("9 the installed statusLine command runs", p.stdout.decode().strip(), "Usage 5h 5% | 7d usage 50% | 7d time 50% | XANH")
+    kiem("9 the installed statusLine command runs", p.stdout.decode().strip(), "7d usage 50% | 7d time 50% | GREEN")
     # uninstall
     chay(ins, c9, args=["--uninstall"])
     s9 = doc(os.path.join(c9, "settings.json"))
