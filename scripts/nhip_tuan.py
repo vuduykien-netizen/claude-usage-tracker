@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-"""nhip_tuan.py - nhip han muc tuan + ty le Fable tu transcript Claude Code. Chi doc tep, khong goi mang.
+"""nhip_tuan.py - weekly pace + Fable share from Claude Code transcripts. Reads files only, no network.
 
-Dung:
-  python3 nhip_tuan.py                      in nhip tuan (da dung % so voi % thoi gian, den) + phan Fable
-  python3 nhip_tuan.py --moc 73 47          ghi mot moc ban doc o /usage: tuan (moi model) 73%, tuan Fable 47%
-  python3 nhip_tuan.py --moc 73             chi moc tuan
-  python3 nhip_tuan.py --moc 73 47 --luc "2026-01-15 13:05"   moc ghi cho gio local cu the
-  python3 nhip_tuan.py --im                 chay im (chi cap nhat bo dem, do hook/thanh trang thai goi o nen)
-  USAGE_TRACKER_LANG=en                     in tieng Anh
+Usage:
+  python3 nhip_tuan.py                      print the weekly pace (% used vs % of time elapsed, light) + the Fable part
+  python3 nhip_tuan.py --moc 73 47          log a marker you read in /usage: week (all models) 73%, Fable week 47%
+  python3 nhip_tuan.py --moc 73             week marker only
+  python3 nhip_tuan.py --moc 73 47 --luc "2026-01-15 13:05"   marker for a specific local time
+  python3 nhip_tuan.py --im                 run silently (only refreshes the cache; called in the background by the hook/status line)
+  USAGE_TRACKER_LANG=en                     print English (the default is the Vietnamese table in lang_vi.py)
 
-Cua so tuan lay tu seven_day.resets_at (do statusline_usage.py ghi). Chua co: tuan tinh tu 00:00 thu Hai
-gan nhat theo gio may va ghi ro la uoc.
-Chi doc 3 truong cua transcript: model, usage, timestamp (khong doc noi dung hoi thoai).
-"quy doi" = vao moi x1 + ghi cache x1,25 + doc cache x0,1 + output x5 (uoc luong).
+The week window comes from seven_day.resets_at (written by statusline_usage.py). If it is missing, the week is
+counted from the most recent Monday 00:00 by the machine clock and the output says it is an estimate.
+Reads only 3 transcript fields: model, usage, timestamp (never conversation content).
+"weighted" = fresh input x1 + cache write x1.25 + cache read x0.1 + output x5 (an estimate).
 """
 import datetime
 import glob
@@ -29,20 +29,7 @@ KS = ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens", 
 W = (1.0, 1.25, 0.1, 5.0)
 
 CH = {
-    "vi": {
-        "tuan": "Tuần từ {a} · đã qua {gio:.0f}/168 giờ = {tg:.0f}% thời gian ({nguon})",
-        "that": "Đã dùng {u:.0f}% (số thật từ thanh trạng thái, cách {tuoi} phút) · lệch {l:+.0f} điểm · đèn {den}",
-        "uoc": "Ước đã dùng {u:.0f}% (từ mốc {luc} = {m:.0f}% + quy đổi phát sinh) · lệch {l:+.0f} điểm · đèn {den}",
-        "none": "Chưa có số tuần: cài thanh trạng thái (install.py) hoặc ghi mốc: nhip_tuan.py --moc <tuần%> [fable%]",
-        "fthat": "Fable: {p:.0f}% (hạn mức riêng theo model do Claude Code gửi)",
-        "fuoc": "Fable: ước {p:.0f}% tuần Fable (mốc {luc} = {m:.0f}%) · quy đổi {q:,.0f} nghìn, {r:.0f}% tổng",
-        "fty": "Fable: {q:,.0f} nghìn quy đổi = {r:.0f}% lượng dùng tuần; chưa có mốc % Fable (đọc /usage rồi: nhip_tuan.py --moc <tuần%> <fable%>)",
-        "fkhong": "Fable: tuần này chưa thấy lượt dùng model Fable trong transcript",
-        "moc": "Đã ghi mốc",
-        "sai": "Số phải trong 0..100",
-        "est": "ước theo giờ máy, chưa có resets_at",
-        "rl": "theo seven_day.resets_at",
-    },
+    "vi": uc.lang_vi.NHIP if uc.lang_vi else {},  # vi is only selected when lang_vi.py is present
     "en": {
         "tuan": "Week from {a} · {gio:.0f}/168 hours elapsed = {tg:.0f}% of time ({nguon})",
         "that": "Used {u:.0f}% (real number from the status line, {tuoi} min old) · gap {l:+.0f} pts · light {den}",
@@ -86,7 +73,7 @@ def doc_moc(tep, tu):
 
 
 def doc_transcript(thu_muc_cau_hinh, tu):
-    """Danh sach (epoch, la_fable, [4 so usage]); khu trung theo message id."""
+    """List of (epoch, is_fable, [4 usage numbers]); de-duplicated by message id."""
     thay, rows = {}, []
     mau = os.path.join(thu_muc_cau_hinh, "projects", "**", "*.jsonl")
     for f in glob.glob(mau, recursive=True):
@@ -160,7 +147,7 @@ def chay():
             f.write(json.dumps(d, ensure_ascii=False) + "\n")
         print(s["moc"], d)
 
-    # cua so tuan
+    # week window
     rate = uc.doc_rate() or {}
     d7 = rate.get("seven_day") if isinstance(rate.get("seven_day"), dict) else None
     het = uc.het_tuan(d7.get("resets"), now) if d7 else None
@@ -179,7 +166,7 @@ def chay():
     ty_le = round(QF * 100 / Q) if Q > 0 else None
     mocs = doc_moc(tep_moc, bat_dau)
 
-    # % tuan: so that (rate.json ghi trong tuan nay) > moc + quy doi
+    # week %: real number (rate.json written this week) > marker + weighted usage since
     uoc, dong1 = None, s["none"]
     if d7 and uc.la_so(d7.get("pct")) and uc.la_so(rate.get("t")) and rate["t"] >= bat_dau:
         uoc = float(d7["pct"])

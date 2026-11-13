@@ -1,7 +1,7 @@
-"""usage_chung.py - ham dung chung cua skill theo-doi-usage (chi thu vien chuan Python 3).
+"""usage_chung.py - shared helpers for the usage-tracker skill (Python 3 standard library only).
 
-Duong dan: thu muc cau hinh Claude Code = bien CLAUDE_CONFIG_DIR, mac dinh ~/.claude.
-Du lieu cua skill ghi o <cau hinh>/usage-tracker/ (rate.json, moc.jsonl, nhip-cache.json).
+Paths: the Claude Code config directory is the CLAUDE_CONFIG_DIR variable, default ~/.claude.
+The skill's data lives in <config>/usage-tracker/ (rate.json, moc.jsonl, nhip-cache.json).
 """
 import datetime
 import json
@@ -11,8 +11,13 @@ import subprocess
 import sys
 import time
 
-TUAN_GIAY = 7 * 86400
-CUA_SO_CHINH = ("five_hour", "seven_day")
+try:  # Vietnamese message tables; the skill still works (in English) if this file is missing
+    import lang_vi
+except ImportError:
+    lang_vi = None
+
+TUAN_GIAY = 7 * 86400  # seconds in the 7-day window
+CUA_SO_CHINH = ("five_hour", "seven_day")  # the two main rate-limit windows
 
 
 def thu_muc_cau_hinh():
@@ -28,6 +33,8 @@ def thu_muc_du_lieu():
 
 def ngon_ngu():
     v = os.environ.get("USAGE_TRACKER_LANG", "vi").strip().lower()
+    if lang_vi is None:
+        return "en"
     return "en" if v.startswith("en") else "vi"
 
 
@@ -36,7 +43,7 @@ def la_so(v):
 
 
 def ra_epoch(v):
-    """So (giay hoac mili giay) hoac chuoi ISO -> epoch giay; khong doc duoc -> None."""
+    """Number (seconds or milliseconds) or ISO string -> epoch seconds; unreadable -> None."""
     if la_so(v):
         return float(v) / 1000.0 if v > 1e12 else float(v)
     if isinstance(v, str) and 0 < len(v) <= 40:
@@ -59,7 +66,7 @@ def doc_json(duong_dan):
 
 
 def ghi_tep(duong_dan, noi_dung):
-    """Ghi tam cung thu muc roi os.replace. Tra ve True neu xong."""
+    """Write to a temp file in the same folder, then os.replace. Returns True when done."""
     tam = "%s.%d.tmp" % (duong_dan, os.getpid())
     try:
         os.makedirs(os.path.dirname(duong_dan), exist_ok=True)
@@ -83,7 +90,7 @@ def ghi_tep(duong_dan, noi_dung):
 
 
 def cua_so(rl, khoa):
-    """Tra ve {'pct': .., 'resets': epoch|None} neu co used_percentage hop le, nguoc lai None."""
+    """Return {'pct': .., 'resets': epoch|None} if the window has a valid used_percentage, else None."""
     w = rl.get(khoa) if isinstance(rl, dict) else None
     if not isinstance(w, dict):
         return None
@@ -94,7 +101,7 @@ def cua_so(rl, khoa):
 
 
 def het_tuan(resets, now):
-    """Moc dat lai tuan sap toi: cuon tien theo boi so 7 ngay neu resets_at da qua."""
+    """Next weekly reset: roll forward in multiples of 7 days if resets_at is already in the past."""
     if not la_so(resets):
         return None
     while resets <= now:
@@ -103,14 +110,14 @@ def het_tuan(resets, now):
 
 
 def phan_tram_tuan_troi(resets, now):
-    """% tuan da troi = 1 - (resets - now)/604800, ep vao 0..100. None neu khong co resets_at trong tuong lai."""
+    """% of the week elapsed = 1 - (resets - now)/604800, clamped to 0..100. None if resets_at is not in the future."""
     if not la_so(resets) or resets <= now:
         return None
     return round(max(0.0, min(1.0, 1 - (resets - now) / float(TUAN_GIAY))) * 100)
 
 
 def ma_den(pct, tg):
-    """Den nhip tuan: pct da dung %, tg % thoi gian da troi. G xanh / Y vang / R do / S du."""
+    """Weekly pace light: pct = % used, tg = % of time elapsed. G green / Y yellow / R red / S spare."""
     lech = pct - tg
     if pct >= 95 or lech > 10:
         return "R"
@@ -122,7 +129,7 @@ def ma_den(pct, tg):
 
 
 NHAN_DEN = {
-    "vi": {"G": "XANH", "Y": "VÀNG", "R": "ĐỎ", "S": "DƯ"},
+    "vi": lang_vi.NHAN_DEN if lang_vi else None,
     "en": {"G": "GREEN", "Y": "YELLOW", "R": "RED", "S": "SPARE"},
 }
 NHAN_DEN_ASCII = {
@@ -141,13 +148,13 @@ def doc_cache(now):
     if not isinstance(c, dict):
         return None
     het = c.get("het")
-    if la_so(het) and het < now:  # cache cua tuan truoc
+    if la_so(het) and het < now:  # cache from a previous week
         return None
     return c
 
 
 def _pct_hien(w, now):
-    """% hien thi cua mot cua so; cua so da dat lai (resets_at qua) -> 0."""
+    """Displayed % of one window; a window that has already reset (resets_at in the past) -> 0."""
     if not w:
         return None
     r = w.get("resets")
@@ -157,7 +164,7 @@ def _pct_hien(w, now):
 
 
 def fable_that(rate):
-    """Cua so rieng theo model co chu 'fable' trong khoa (neu Claude Code gui)."""
+    """The per-model window whose key contains 'fable' (if Claude Code sends one)."""
     khac = (rate or {}).get("khac")
     if isinstance(khac, dict):
         for k, w in khac.items():
@@ -167,9 +174,9 @@ def fable_that(rate):
 
 
 def lam_moi_nen(now):
-    """Neu bo dem nhip cu > 60 phut (hoac chua co): chay nhip_tuan.py --im o nen, khong cho. Khoa 120 giay."""
+    """If the pace cache is older than 60 minutes (or missing): run nhip_tuan.py --im in the background, without waiting. 120 s lock."""
     try:
-        if os.environ.get("USAGE_TRACKER_NO_REFRESH"):  # chi de thu
+        if os.environ.get("USAGE_TRACKER_NO_REFRESH"):  # for tests only
             return
         dl = thu_muc_du_lieu()
         c = doc_json(os.path.join(dl, "nhip-cache.json"))
@@ -194,7 +201,7 @@ def lam_moi_nen(now):
 
 
 def dong_ngan(rate, cache, now):
-    """Dong thanh trang thai (ASCII): Usage 5h X% | Fable Z% | 7d usage Y% | 7d time T% | DEN (Fable dung truoc 7d)"""
+    """Status-line text (ASCII): Usage 5h X% | Fable Z% | 7d usage Y% | 7d time T% | LIGHT (Fable comes before 7d)"""
     ng = ngon_ngu()
     h5 = _pct_hien((rate or {}).get("five_hour"), now)
     d7w = (rate or {}).get("seven_day")

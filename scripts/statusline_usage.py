@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""statusline_usage.py - thanh trang thai Claude Code: han muc 5 gio, 7 ngay, Fable, nhip tuan.
+"""statusline_usage.py - Claude Code status line: 5-hour and 7-day limits, Fable, weekly pace.
 
-Doc JSON statusLine tu stdin (chi truong rate_limits), ghi <cau hinh>/usage-tracker/rate.json,
-in MOT dong ASCII:  Usage 5h 23% | Fable 17% tong | 7d usage 56% | 7d time 48% | VANG
-  --quiet : chi ghi du lieu, khong in gi (de noi vao thanh trang thai co san cua ban)
-Khong doc noi dung hoi thoai, khong goi mang, khong ghi de du lieu cu khi thieu khoa / JSON hong.
-Khong bao gio nem loi ra ngoai (thanh trang thai khong duoc vo).
+Reads the statusLine JSON from stdin (only the rate_limits field), writes <config>/usage-tracker/rate.json,
+and prints ONE ASCII line:  Usage 5h 23% | Fable 17% tong | 7d usage 56% | 7d time 48% | VANG
+(the trailing words are the default Vietnamese labels; with USAGE_TRACKER_LANG=en they read "of total" and YELLOW)
+  --quiet : only write the data, print nothing (to chain into your existing status line)
+Never reads conversation content, never uses the network, never overwrites old data when a key is missing or the JSON is broken.
+Never raises (a status line must not break).
 """
 import json
 import os
@@ -45,7 +46,7 @@ def chay(quiet):
             print("Usage -")
         return
     cu = uc.doc_rate() or {}
-    # cua so thieu lan nay (vd chi co 7d vi cua so 5h chua mo): giu so cu neu cua so do chua het han
+    # a window missing this time (e.g. only 7d because the 5h window is not open): keep the old value if that window has not expired
 
     def giu(moi, khoa):
         if moi is not None:

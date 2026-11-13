@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""hook_usage.py - hook UserPromptSubmit cua Claude Code: in MOT dong nhac usage moi luot.
+"""hook_usage.py - Claude Code UserPromptSubmit hook: prints ONE usage reminder line per prompt.
 
-Doc <cau hinh>/usage-tracker/rate.json (do statusline_usage.py ghi) va nhip-cache.json (do nhip_tuan.py ghi).
-Stdout cua hook nay duoc Claude Code them vao ngu canh luot do. Khong doc noi dung lenh cua ban.
-Bo dem nhip cu > 60 phut thi chay nhip_tuan.py o nen (khong cho). Luon thoat 0, khong nem loi.
-USAGE_TRACKER_LANG=en de in tieng Anh.
+Reads <config>/usage-tracker/rate.json (written by statusline_usage.py) and nhip-cache.json (written by nhip_tuan.py).
+Claude Code adds this hook's stdout to the context of that turn. It never reads the content of your prompt.
+If the pace cache is older than 60 minutes, nhip_tuan.py is started in the background (no waiting). Always exits 0, never raises.
+USAGE_TRACKER_LANG=en prints English (the default is the Vietnamese table in lang_vi.py).
 """
 import os
 import sys
@@ -15,17 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import usage_chung as uc  # noqa: E402
 
 CH = {
-    "vi": {
-        "none": "usage: chưa có số (thanh trạng thái chưa ghi lần nào)",
-        "ago": "số cách {m} phút", "old": " (CŨ)", "time": "tuần đã trôi {t}%", "reset": "reset {g}",
-        "r5": "5h ≥90%: nên chốt việc đang làm, không mở việc mới",
-        "r5b": "5h ≥75%: dùng model nhẹ, gom việc",
-        "r7": "7d ≥95%: chỉ việc gấp",
-        "Y": "7d đi nhanh hơn lịch: giảm việc song song, dùng model nhẹ",
-        "R": "7d vượt lịch nhiều: chỉ việc có hạn",
-        "S": "7d còn dư: có thể xả việc xếp hàng",
-        "light": "đèn", "fable": "Fable", "tong": "{r}% lượng dùng tuần",
-    },
+    "vi": uc.lang_vi.HOOK if uc.lang_vi else {},  # vi is only selected when lang_vi.py is present
     "en": {
         "none": "usage: no number yet (status line has not written any)",
         "ago": "{m} min old", "old": " (STALE)", "time": "week {t}% elapsed", "reset": "reset {g}",
@@ -101,7 +91,7 @@ if __name__ == "__main__":
         except Exception:
             pass
         try:
-            sys.stdin.buffer.read()  # bo qua noi dung hook gui vao
+            sys.stdin.buffer.read()  # ignore the payload Claude Code sends to the hook
         except Exception:
             pass
         now = time.time()
