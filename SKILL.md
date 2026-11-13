@@ -5,6 +5,8 @@ description: Track the Claude Code 7-day usage limit on the status line, plus a 
 
 # Usage tracker
 
+By Vu Duy Kien · https://vuduykien.com
+
 ## 1. What it does
 The status line shows one line, in a fixed order:
 

@@ -1,5 +1,7 @@
 # claude-usage-tracker
 
+**By [Vu Duy Kien](https://vuduykien.com)** · [vuduykien.com](https://vuduykien.com)
+
 A Claude Code skill that shows your 7-day usage limit right on the status line, together with a weekly pace light and your Fable share. Pure Python 3 standard library, no dependencies, works on Windows, macOS and Linux. MIT licensed.
 
 ```text
@@ -89,6 +91,10 @@ It reads only three fields, `model`, `usage` and `timestamp`, from your transcri
 
 `SKILL.md` · `install.py` · `scripts/statusline_usage.py` · `scripts/hook_usage.py` · `scripts/nhip_tuan.py` · `scripts/usage_chung.py` · `tests/kiem_thu.py` · `LICENSE`
 
+## Author
+
+Made by **Vu Duy Kien** · website: [vuduykien.com](https://vuduykien.com). More skills and courses at [vuduykien.com](https://vuduykien.com).
+
 ## License
 
-MIT, see [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE). Copyright (c) 2026 Vu Duy Kien.
