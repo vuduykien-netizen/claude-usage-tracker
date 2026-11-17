@@ -5,6 +5,7 @@ Reads <config>/usage-tracker/rate.json (written by statusline_usage.py) and nhip
 Claude Code adds this hook's stdout to the context of that turn. It never reads the content of your prompt.
 If the pace cache is older than 60 minutes, nhip_tuan.py is started in the background (no waiting). Always exits 0, never raises.
 """
+import json
 import os
 import sys
 import time
@@ -28,7 +29,7 @@ def gio(ts):
     return time.strftime("%H:%M %d/%m", time.localtime(ts))
 
 
-def dong(now):
+def dong(now, dau=""):
     s = S
     rate = uc.doc_rate()
     if not rate:
@@ -63,21 +64,28 @@ def dong(now):
         out += s["old"]
     if canh:
         out += " · ! " + "; ".join(canh)
-    return out
+    return dau + out
 
 
 if __name__ == "__main__":
     try:
+        raw = b""
         try:
             sys.stdout.reconfigure(encoding="utf-8")
         except Exception:
             pass
         try:
-            sys.stdin.buffer.read()  # ignore the payload Claude Code sends to the hook
+            raw = sys.stdin.buffer.read()  # only the folder fields are used, never the prompt
         except Exception:
             pass
         now = time.time()
-        print(dong(now))
+        dau = ""
+        try:
+            data = json.loads(raw.decode("utf-8", errors="replace"))
+            dau = uc.tien_to_du_an(*([os.environ.get("CLAUDE_PROJECT_DIR")] + uc.duong_dan_tu_json(data)))
+        except Exception:
+            dau = uc.tien_to_du_an(os.environ.get("CLAUDE_PROJECT_DIR"))
+        print(dong(now, dau))
         uc.lam_moi_nen(now)
     except Exception:
         pass

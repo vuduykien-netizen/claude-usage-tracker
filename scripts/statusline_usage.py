@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """statusline_usage.py - Claude Code status line: 7-day limit, Fable, weekly pace.
 
-Reads the statusLine JSON from stdin (only the rate_limits field), writes <config>/usage-tracker/rate.json,
-and prints ONE ASCII line:  7d Fable usage 17% | 7d usage 56% | 7d time 48% | YELLOW
+Reads the statusLine JSON from stdin (only the rate_limits and the project folder fields), writes <config>/usage-tracker/rate.json,
+and prints ONE line:  [<project> | ]7d Fable usage 17% | 7d usage 56% | 7d time 48% | YELLOW
 (the light is GREEN / YELLOW / RED / SPARE; the Fable part appears only when it is known)
   --quiet : only write the data, print nothing (to chain into your existing status line)
 Never reads conversation content, never uses the network, never overwrites old data when a key is missing or the JSON is broken.
@@ -31,6 +31,10 @@ def doc_stdin():
 def chay(quiet):
     now = time.time()
     data = doc_stdin()
+    try:
+        dau = uc.tien_to_du_an(*uc.duong_dan_tu_json(data))
+    except Exception:
+        dau = ""
     rl = data.get("rate_limits") if isinstance(data, dict) else None
     d7 = uc.cua_so(rl, "seven_day")
     khac = {}
@@ -42,7 +46,7 @@ def chay(quiet):
                     khac[TEN_AN_TOAN.sub("_", str(k))[:40]] = w
     if d7 is None and not khac:
         if not quiet:
-            print("Usage -")
+            print(dau + "Usage -")
         return
     cu = uc.doc_rate() or {}
     # a window missing this time: keep the old value if that window has not expired
@@ -59,10 +63,14 @@ def chay(quiet):
     uc.ghi_tep(os.path.join(uc.thu_muc_du_lieu(), "rate.json"), json.dumps(rate, ensure_ascii=True))
     uc.lam_moi_nen(now)
     if not quiet:
-        print(uc.dong_ngan(rate, uc.doc_cache(now), now))
+        print(dau + uc.dong_ngan(rate, uc.doc_cache(now), now))
 
 
 if __name__ == "__main__":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
     q = "--quiet" in sys.argv[1:]
     try:
         chay(q)
