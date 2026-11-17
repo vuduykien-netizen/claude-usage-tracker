@@ -7,6 +7,7 @@ import datetime
 import json
 import math
 import os
+import re
 import subprocess
 import sys
 import time
@@ -205,3 +206,35 @@ def dong_ngan(rate, cache, now):
         if d7 is not None:
             parts.append(NHAN_DEN[ma_den(d7, tg)])
     return " | ".join(parts)
+
+
+TEN_TOI_DA = 24
+
+
+def ten_du_an(*duong_dan):
+    """Project name = last folder of the first usable path (workspace.project_dir, then current_dir, then cwd).
+    Handles Windows and POSIX separators and a trailing slash; longer than 24 characters -> cut + an ellipsis;
+    nothing usable -> '' (no prefix)."""
+    for p in duong_dan:
+        if not isinstance(p, str):
+            continue
+        parts = [x for x in re.split(r"[\\/]+", p.strip().strip('"')) if x]
+        if parts and not re.fullmatch(r"[A-Za-z]:", parts[-1]):
+            ten = parts[-1].strip()
+            if ten:
+                return ten if len(ten) <= TEN_TOI_DA else ten[:TEN_TOI_DA].rstrip() + "\u2026"
+    return ""
+
+
+def tien_to_du_an(*duong_dan):
+    """'<name> │ ' or '' when there is no name."""
+    ten = ten_du_an(*duong_dan)
+    return (ten + " \u2502 ") if ten else ""
+
+
+def duong_dan_tu_json(data):
+    """Paths from a status line / hook JSON, in priority order."""
+    if not isinstance(data, dict):
+        return []
+    ws = data.get("workspace") if isinstance(data.get("workspace"), dict) else {}
+    return [ws.get("project_dir"), ws.get("current_dir"), data.get("cwd")]

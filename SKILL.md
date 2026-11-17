@@ -10,7 +10,9 @@ By Vu Duy Kien · https://vuduykien.com
 ## 1. What it does
 The status line shows one line, in a fixed order:
 
-`7d Fable usage 17% | 7d usage 56% | 7d time 48% | YELLOW`
+`my-project │ 7d Fable usage 17% | 7d usage 56% | 7d time 48% | YELLOW`
+
+The first field is the project name: the last folder of `workspace.project_dir` (then `workspace.current_dir`, then `cwd`; the hook uses `CLAUDE_PROJECT_DIR` or `cwd`), cut to 24 characters plus `…` when longer, omitted when no folder is known. The reminder line from the hook starts with the same prefix.
 
 All output is English. There is no 5-hour field (that limit window no longer exists; the tracker ignores it).
 

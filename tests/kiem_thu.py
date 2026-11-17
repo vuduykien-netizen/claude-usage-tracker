@@ -23,7 +23,7 @@ KQ = []
 
 def chay(script, cfg, stdin="", args=(), env_them=None):
     env = dict(os.environ)
-    env.update({"CLAUDE_CONFIG_DIR": cfg, "USAGE_TRACKER_NO_REFRESH": "1", "PYTHONUTF8": "1"})
+    env.update({"CLAUDE_CONFIG_DIR": cfg, "USAGE_TRACKER_NO_REFRESH": "1", "PYTHONUTF8": "1", "CLAUDE_PROJECT_DIR": ""})
     env.update(env_them or {})
     p = subprocess.run([sys.executable, script] + list(args), input=stdin.encode("utf-8"),
                        capture_output=True, env=env, timeout=60)
@@ -205,6 +205,44 @@ def main():
     open(os.path.join(c10, "settings.json"), "w").write("{broken")
     rc, out, _ = chay(ins, c10)
     kiem("10 broken settings: stop, write nothing", (rc, open(os.path.join(c10, "settings.json")).read()), (2, "{broken"))
+
+    # 11) project name prefix (status line + hook)
+    c11 = os.path.join(goc_tam, "c11")
+    SL = os.path.join(SC, "statusline_usage.py")
+    HK = os.path.join(SC, "hook_usage.py")
+    base = "7d usage 50% | 7d time 50% | GREEN"
+    rlj = json.loads(stdin_rl(d7=50))["rate_limits"]
+
+    def sl(ws=None, cwd=None):
+        d = {"rate_limits": rlj}
+        if ws is not None:
+            d["workspace"] = ws
+        if cwd is not None:
+            d["cwd"] = cwd
+        return chay(SL, c11, json.dumps(d))[1]
+
+    kiem("11 plain name", sl({"project_dir": "/home/u/my-app"}), "my-app \u2502 " + base)
+    kiem("11 Windows path", sl({"project_dir": "C:\\a\\b"}), "b \u2502 " + base)
+    kiem("11 trailing slash", sl({"project_dir": "/x/y/proj/"}), "proj \u2502 " + base)
+    kiem("11 diacritics kept", sl({"project_dir": "C:\\work\\\u0110\u1ec1 t\u00e0i"}), "\u0110\u1ec1 t\u00e0i \u2502 " + base)
+    kiem("11 long name cut at 24 + ellipsis", sl({"project_dir": "/p/" + "a" * 30}), "a" * 24 + "\u2026 \u2502 " + base)
+    kiem("11 exactly 24 not cut", sl({"project_dir": "/p/" + "b" * 24}), "b" * 24 + " \u2502 " + base)
+    kiem("11 falls back to current_dir", sl({"current_dir": "/q/cur"}), "cur \u2502 " + base)
+    kiem("11 falls back to cwd", sl(None, "/q/cw"), "cw \u2502 " + base)
+    kiem("11 project_dir wins over current_dir", sl({"project_dir": "/q/root", "current_dir": "/q/root/sub"}), "root \u2502 " + base)
+    kiem("11 no folder at all: no prefix", sl(), base)
+    kiem("11 missing directory still works", sl({"project_dir": "/no/such/dir/zz"}), "zz \u2502 " + base)
+    kiem("11 drive root only: no prefix", sl({"project_dir": "C:\\"}), base)
+    rc, out, _ = chay(SL, c11, "not json {{")
+    kiem("11 broken JSON still 'Usage -'", (rc, out), (0, "Usage -"))
+    rc, out, _ = chay(SL, c11, json.dumps({"workspace": {"project_dir": "/z/pp"}}))
+    kiem("11 no rate_limits: prefix + 'Usage -'", out, "pp \u2502 Usage -")
+    rc, out, _ = chay(HK, c1, json.dumps({"cwd": "/h/hookproj"}))
+    kiem("11 hook prefix from cwd", out.startswith("hookproj \u2502 7d usage 64%"), True)
+    rc, out, _ = chay(HK, c1, "{}", env_them={"CLAUDE_PROJECT_DIR": "C:\\w\\envproj"})
+    kiem("11 hook prefix from CLAUDE_PROJECT_DIR", out.startswith("envproj \u2502 7d usage 64%"), True)
+    rc, out, _ = chay(HK, c1, "{}")
+    kiem("11 hook without folder: no prefix", out.startswith("7d usage 64%"), True)
 
     dat = sum(1 for _, o in KQ if o)
     if PHA:

@@ -5,7 +5,7 @@
 A Claude Code skill that shows your 7-day usage limit right on the status line, together with a weekly pace light and your Fable share. Pure Python 3 standard library, no dependencies, works on Windows, macOS and Linux. MIT licensed.
 
 ```text
-7d Fable usage 17% | 7d usage 56% | 7d time 48% | YELLOW
+my-project │ 7d Fable usage 17% | 7d usage 56% | 7d time 48% | YELLOW
 ```
 
 Everything it prints is in English. There is no 5-hour field: that limit window no longer exists, so the tracker ignores it if Claude Code still sends it.
@@ -14,6 +14,7 @@ Everything it prints is in English. There is no 5-hour field: that limit window 
 
 | Field | Meaning |
 |---|---|
+| project name | Name of the project folder, first on the line (`my-project │ `). Taken from `workspace.project_dir` in the status line JSON, then `workspace.current_dir`, then `cwd`; the hook uses `CLAUDE_PROJECT_DIR` or `cwd`. Names longer than 24 characters are cut and end with `…`; accents are kept; with no folder in the JSON the prefix is simply left out. |
 | `7d Fable usage` | `17%`: a real per-model limit, if your Claude Code sends one. `~17%`: an estimate from a `/usage` marker you logged. Plain `17%` from the transcripts: Fable's share of this week's usage, computed from your transcripts. |
 | `7d usage` | Percent of the 7-day limit used (the real number). |
 | `7d time` | Percent of the 7-day window that has already elapsed, computed from `seven_day.resets_at`. |
