@@ -5,6 +5,8 @@
   python3 install.py --dry-run     only print what would be done, write nothing
   python3 install.py --uninstall   remove: delete only the entries it added and the bin files the skill created; keep the data and the config directory
   python3 install.py --config-dir <dir>   (default: CLAUDE_CONFIG_DIR or ~/.claude)
+  python3 install.py --codex       Codex CLI instead: set [tui] status_line in <codex home>/config.toml
+                                   (codex home = CODEX_HOME or ~/.codex); works with --dry-run and --uninstall
 
 Safety:
 - Backs up settings.json before editing (settings.json.usage-tracker.<time>.bak).
@@ -12,9 +14,12 @@ Safety:
 - You already have another statusLine -> NOT overwritten; prints how to chain it (statusline_usage.py --quiet).
 - UserPromptSubmit hook: adds one new group and keeps your existing hooks.
 - Keeps every other key of settings.json.
+- Codex: backs up config.toml (config.toml.usage-tracker.<time>.bak), edits only the status_line key of [tui],
+  never overwrites a status_line you set yourself, and --uninstall removes it only if it is still this one.
 """
 import json
 import os
+import re
 import shutil
 import sys
 import time
@@ -188,7 +193,86 @@ def go(cfg, dry):
     return 0
 
 
+# ---------------- Codex CLI ----------------
+CODEX_ITEMS = ["project-name", "model-with-reasoning", "context-used", "weekly-limit", "five-hour-limit"]
+RE_TUI = re.compile(r"^\s*\[\s*tui\s*\]\s*(#.*)?$")
+RE_BANG = re.compile(r"^\s*\[")
+RE_KHOA = re.compile(r"^\s*status_line\s*=")
+
+
+def dong_codex(items):
+    return "status_line = [%s]" % ", ".join('"%s"' % i for i in items)
+
+
+def tim_status_line(dong):
+    """(start_tui, end_tui, i, j) of the status_line key inside [tui]; None parts when absent."""
+    s = next((k for k, l in enumerate(dong) if RE_TUI.match(l)), None)
+    if s is None:
+        return None, None, None, None
+    e = next((k for k in range(s + 1, len(dong)) if RE_BANG.match(dong[k])), len(dong))
+    for i in range(s + 1, e):
+        if RE_KHOA.match(dong[i]):
+            j, sau = i, dong[i].count("[") - dong[i].count("]")
+            while sau > 0 and j + 1 < e:  # multi-line array
+                j += 1
+                sau += dong[j].count("[") - dong[j].count("]")
+            return s, e, i, j
+    return s, e, None, None
+
+
+def codex_sua(text, go_bo=False):
+    """Return (new_text or None if refused, message). Pure function, tested in tests/kiem_thu.py."""
+    dong = text.splitlines()
+    ours = dong_codex(CODEX_ITEMS)
+    s, e, i, j = tim_status_line(dong)
+    hien = " ".join(x.strip() for x in dong[i:j + 1]) if i is not None else None
+    la_ta = hien is not None and hien.replace(" ", "") == ours.replace(" ", "")
+    if go_bo:
+        if not la_ta:
+            return text, "status_line: not set by usage-tracker, left alone"
+        return "\n".join(dong[:i] + dong[j + 1:]) + "\n", "status_line: removed"
+    if la_ta:
+        return text, "status_line: already set"
+    if hien is not None:
+        return None, "status_line: you ALREADY HAVE one, not overwritten: " + hien
+    if s is None:
+        sep = "" if not text or text.endswith("\n\n") else ("\n" if text.endswith("\n") else "\n\n")
+        return text + sep + "[tui]\n" + ours + "\n", "status_line: added a [tui] table"
+    return "\n".join(dong[:s + 1] + [ours] + dong[s + 1:]) + "\n", "status_line: added to [tui]"
+
+
+def codex(dry, go_bo):
+    home = os.environ.get("CODEX_HOME", "").strip().strip('"') or os.path.join(os.path.expanduser("~"), ".codex")
+    tep = os.path.join(os.path.abspath(os.path.expanduser(home)), "config.toml")
+    text = ""
+    if os.path.exists(tep):
+        with open(tep, encoding="utf-8") as f:
+            text = f.read()
+    moi, msg = codex_sua(text, go_bo)
+    print(" - Codex %s: %s" % (tep, msg))
+    if moi is None:
+        print("   To use this one instead, replace that line by hand with:  " + dong_codex(CODEX_ITEMS))
+        return 0
+    if moi == text or dry:
+        if dry:
+            print("[dry-run] nothing written.")
+        return 0
+    if os.path.exists(tep):
+        bak = "%s.usage-tracker.%s.bak" % (tep, time.strftime("%Y%m%d-%H%M%S"))
+        shutil.copyfile(tep, bak)
+        print(" - backup: " + bak)
+    os.makedirs(os.path.dirname(tep), exist_ok=True)
+    tam = tep + ".tmp"
+    with open(tam, "w", encoding="utf-8", newline="\n") as f:
+        f.write(moi)
+    os.replace(tam, tep)
+    print("Done. Restart Codex to see the status line.")
+    return 0
+
+
 if __name__ == "__main__":
-    cfg = thu_muc_cau_hinh()
     dry = "--dry-run" in sys.argv[1:]
+    if "--codex" in sys.argv[1:]:
+        sys.exit(codex(dry, "--uninstall" in sys.argv[1:]))
+    cfg = thu_muc_cau_hinh()
     sys.exit(go(cfg, dry) if "--uninstall" in sys.argv[1:] else cai(cfg, dry))
