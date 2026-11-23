@@ -30,8 +30,6 @@ All output is English. There is no 5-hour field (that limit window no longer exi
 ## 3. Install / uninstall
 `python3 install.py` backs up `settings.json`, copies the scripts to `<config>/usage-tracker/bin/`, adds a `statusLine` (if none exists) and one `UserPromptSubmit` hook group. If another status line exists it is not overwritten; the installer prints how to chain it (`statusline_usage.py --quiet`). Uninstall: `python3 install.py --uninstall`. Details are in `README.md`.
 
-Codex CLI: `python3 install.py --codex` sets `[tui] status_line` in `<codex home>/config.toml` (`CODEX_HOME` or `~/.codex`) to project, model + reasoning, context used, weekly and 5-hour limits; it backs up first, never overwrites a `status_line` the user set, and `--codex --uninstall` removes only its own line.
-
 ## 4. Stop points
 - Do not edit `settings.json` by hand or with any command other than `install.py` (it backs up first and asks before touching what already exists).
 - Never overwrite the user's existing status line or hooks. If they want a full replacement, let them edit it themselves.

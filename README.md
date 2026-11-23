@@ -10,7 +10,7 @@ my-project │ 7d Fable usage 17% | 7d usage 56% | 7d time 48% | YELLOW
 
 Everything it prints is in English. There is no 5-hour field: that limit window no longer exists, so the tracker ignores it if Claude Code still sends it.
 
-It also sets up the same kind of line for the **OpenAI Codex CLI** (`python3 install.py --codex`): project folder, model and reasoning, context used, weekly and 5-hour limits. See [Codex CLI](#codex-cli).
+Using the OpenAI Codex CLI? See the companion skill [codex-usage-tracker](https://github.com/vuduykien-netizen/codex-usage-tracker).
 
 ## What the status line shows
 
@@ -44,21 +44,6 @@ Example: 56% used when 48% of the week has elapsed is 8 points ahead, which is `
 What `install.py` does: backs up `settings.json` (`settings.json.usage-tracker.<time>.bak`), copies the scripts to `<config>/usage-tracker/bin/`, adds a `statusLine` if you do not have one, adds one `UserPromptSubmit` hook group (your existing hooks are kept) and keeps every other key. If you already have a status line it is **not overwritten**: the installer prints the command to chain instead, for example forwarding the stdin JSON from your own script to `statusline_usage.py --quiet` (which only records the numbers and prints nothing).
 
 On Windows use `py -3` or `python` instead of `python3` if needed. `<config>` is `CLAUDE_CONFIG_DIR`, `~/.claude` by default.
-
-## Codex CLI
-
-Codex draws its status line itself from built-in items, so there is no script and no hook to run. The installer only sets one key in the `[tui]` table of `~/.codex/config.toml` (or `$CODEX_HOME/config.toml`):
-
-```toml
-[tui]
-status_line = ["project-name", "model-with-reasoning", "context-used", "weekly-limit", "five-hour-limit"]
-```
-
-- Install: `python3 install.py --codex` (add `--dry-run` to preview). It backs up `config.toml` first (`config.toml.usage-tracker.<time>.bak`) and keeps every other key.
-- If you already set your own `status_line`, it is **not overwritten**; the installer prints the line to paste if you want this one.
-- Uninstall: `python3 install.py --codex --uninstall` removes the key only if it is still the one the installer wrote.
-- Codex leaves out an item when it has no data. Inside Codex, `/statusline` changes the items for the current session.
-- Tested with codex-cli 0.169. The snippet is also in [`codex/config.toml`](codex/config.toml).
 
 ## Usage
 
@@ -107,7 +92,7 @@ It reads only three fields, `model`, `usage` and `timestamp`, from your transcri
 
 ## Files
 
-`SKILL.md` · `install.py` · `codex/config.toml` · `scripts/statusline_usage.py` · `scripts/hook_usage.py` · `scripts/nhip_tuan.py` · `scripts/usage_chung.py` · `tests/kiem_thu.py` · `LICENSE`
+`SKILL.md` · `install.py` · `scripts/statusline_usage.py` · `scripts/hook_usage.py` · `scripts/nhip_tuan.py` · `scripts/usage_chung.py` · `tests/kiem_thu.py` · `LICENSE`
 
 ## Author
 

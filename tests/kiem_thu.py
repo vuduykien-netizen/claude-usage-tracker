@@ -244,42 +244,6 @@ def main():
     rc, out, _ = chay(HK, c1, "{}")
     kiem("11 hook without folder: no prefix", out.startswith("7d usage 64%"), True)
 
-    # 12) Codex CLI: install.py --codex edits only [tui] status_line in CODEX_HOME/config.toml
-    INS = os.path.join(GOC, "install.py")
-    OURS = 'status_line = ["project-name", "model-with-reasoning", "context-used", "weekly-limit", "five-hour-limit"]'
-
-    def cx(home, *args):
-        return chay(INS, os.path.join(goc_tam, "c12-claude"), "", ("--codex",) + args, {"CODEX_HOME": home})
-
-    def txt(p):
-        with open(p, encoding="utf-8") as f:
-            return f.read()
-
-    h1 = os.path.join(goc_tam, "c12a")
-    rc, out, _ = cx(h1)
-    kiem("12 codex: new config gets a [tui] table", (rc, txt(os.path.join(h1, "config.toml"))), (0, "[tui]\n" + OURS + "\n"))
-    h2 = os.path.join(goc_tam, "c12b")
-    os.makedirs(h2)
-    goc2 = 'model = "x"\n\n[tui.model_availability_nux]\na = 4\n'
-    with open(os.path.join(h2, "config.toml"), "w", encoding="utf-8") as f:
-        f.write(goc2)
-    cx(h2, "--dry-run")
-    kiem("12 codex: --dry-run writes nothing", txt(os.path.join(h2, "config.toml")), goc2)
-    cx(h2)
-    kiem("12 codex: [tui.sub] is not [tui], other keys kept", txt(os.path.join(h2, "config.toml")), goc2 + "\n[tui]\n" + OURS + "\n")
-    kiem("12 codex: backup written", any(n.startswith("config.toml.usage-tracker.") for n in os.listdir(h2)), True)
-    h3 = os.path.join(goc_tam, "c12c")
-    os.makedirs(h3)
-    goc3 = '[tui]\nstatus_line = [\n  "model",\n]\nx = 1\n'
-    with open(os.path.join(h3, "config.toml"), "w", encoding="utf-8") as f:
-        f.write(goc3)
-    rc, out, _ = cx(h3)
-    kiem("12 codex: user's own status_line not overwritten", (rc, txt(os.path.join(h3, "config.toml"))), (0, goc3))
-    rc, out, _ = cx(h3, "--uninstall")
-    kiem("12 codex: --uninstall leaves the user's line alone", txt(os.path.join(h3, "config.toml")), goc3)
-    cx(h2, "--uninstall")
-    kiem("12 codex: --uninstall removes only our line", txt(os.path.join(h2, "config.toml")), goc2 + "\n[tui]\n")
-
     dat = sum(1 for _, o in KQ if o)
     if PHA:
         print("TOTAL deliberately-wrong run: caught %d/%d cases" % (len(KQ) - dat, len(KQ)))
