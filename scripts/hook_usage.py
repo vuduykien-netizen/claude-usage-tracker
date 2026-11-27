@@ -39,9 +39,10 @@ def dong(now, dau=""):
     w7 = rate.get("seven_day") if isinstance(rate.get("seven_day"), dict) else None
     if w7 and uc.la_so(w7.get("pct")):
         r7 = w7.get("resets")
-        d7 = 0.0 if (uc.la_so(r7) and r7 <= now) else w7["pct"]
-        t = "7d usage %g%%" % round(d7, 1)
-        tg = uc.phan_tram_tuan_troi(r7, now)
+        old = uc.la_so(r7) and r7 <= now  # that week is over: its number is stale, never show it as 0
+        d7 = None if old else w7["pct"]
+        t = "7d usage - (STALE: week reset, waiting for a new number)" if old else "7d usage %g%%" % round(d7, 1)
+        tg = None if old else uc.phan_tram_tuan_troi(r7, now)
         if tg is not None:
             t += " / %s (%s)" % (s["time"].format(t=tg), s["reset"].format(g=gio(r7)))
             ma = uc.ma_den(d7, tg)

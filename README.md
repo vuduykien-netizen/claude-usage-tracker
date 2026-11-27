@@ -61,6 +61,16 @@ python3 ~/.claude/skills/theo-doi-usage/scripts/nhip_tuan.py --moc 73 47
 
 Add `--luc "2026-01-15 13:05"` if you read the numbers at another time. `--moc 73` logs the week number only.
 
+## Optional: terminal tab title
+
+`install.py --tab-title` also copies `scripts/tab_title.py` and adds it as a `SessionStart` and `UserPromptSubmit` hook. It names the terminal tab after the project: a folder map in `<config>/usage-tracker/tab-names.json` (`{"<folder>": "<tab name>"}`, longest match wins), else the nearest parent folder holding `.git` or `CLAUDE.md`, else the working folder; a leading "NN." number is dropped, names are cut at 60 characters. It never blocks a session (any error prints nothing). Uninstall removes it too.
+
+## Numbers you can trust
+
+- The weekly window always comes from `seven_day.resets_at`, so "7d time" is the same in the status line, the reminder and `nhip_tuan.py`.
+- Usage never goes down inside one window: a lower reading for the same window (for example 0% before the first reply) is ignored and the stored number is kept.
+- A window whose `resets_at` has passed is shown as `-` / `STALE`, never as 0%.
+
 ## Uninstall safely
 
 `python3 ~/.claude/skills/theo-doi-usage/install.py --uninstall` (add `--dry-run` to preview) only:
@@ -92,7 +102,7 @@ It reads only three fields, `model`, `usage` and `timestamp`, from your transcri
 
 ## Files
 
-`SKILL.md` · `install.py` · `scripts/statusline_usage.py` · `scripts/hook_usage.py` · `scripts/nhip_tuan.py` · `scripts/usage_chung.py` · `tests/kiem_thu.py` · `LICENSE`
+`SKILL.md` · `install.py` · `scripts/statusline_usage.py` · `scripts/hook_usage.py` · `scripts/nhip_tuan.py` · `scripts/usage_chung.py` · `scripts/tab_title.py` (optional) · `tests/kiem_thu.py` · `LICENSE`
 
 ## Author
 
