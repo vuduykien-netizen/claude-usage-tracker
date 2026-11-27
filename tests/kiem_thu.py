@@ -244,6 +244,76 @@ def main():
     rc, out, _ = chay(HK, c1, "{}")
     kiem("11 hook without folder: no prefix", out.startswith("7d usage 64%"), True)
 
+    # 12) bug A: a lower reading in the same window must not replace the stored number; an expired window is never shown as 0
+    c12 = os.path.join(goc_tam, "c12")
+    dong_tu(c12, d7=50)
+    rc, out, _ = dong_tu(c12, d7=0)
+    kiem("12 a 0% reading inside the same window is ignored (shows 50%)", out, "7d usage 50% | 7d time 50% | GREEN")
+    kiem("12 rate.json keeps 50", doc(os.path.join(c12, "usage-tracker", "rate.json"))["seven_day"]["pct"], 50.0)
+    c12b = os.path.join(goc_tam, "c12b")
+    os.makedirs(os.path.join(c12b, "usage-tracker"))
+    json.dump({"t": int(now) - 7200, "seven_day": {"pct": 77.0, "resets": now - 3600}, "khac": {}},
+              open(os.path.join(c12b, "usage-tracker", "rate.json"), "w"))
+    rc, out, _ = chay(os.path.join(SC, "hook_usage.py"), c12b, "{}")
+    kiem("12 expired window: hook shows STALE, not 0%", ("7d usage - (STALE" in out, "7d usage 0%" in out, "77%" in out), (True, False, False))
+    rc, out, _ = chay(os.path.join(SC, "statusline_usage.py"), c12b, json.dumps({"model": {"id": "x"}}))
+    kiem("12 no rate_limits at all: 'Usage -', not 0", out, "Usage -")
+    # 13) bug B: the week comes from resets_at (12 h left = 93% elapsed), all three places agree
+    c13 = os.path.join(goc_tam, "c13")
+    os.makedirs(os.path.join(c13, "usage-tracker"))
+    json.dump({"t": int(now), "seven_day": {"pct": 40.0, "resets": now + 43200}, "khac": {}},
+              open(os.path.join(c13, "usage-tracker", "rate.json"), "w"))
+    rc, out, _ = chay(os.path.join(SC, "nhip_tuan.py"), c13)
+    kiem("13 nhip_tuan: 93% of time, source resets_at", ("= 93% of time" in out.splitlines()[0], "seven_day.resets_at" in out.splitlines()[0]), (True, True))
+    rc, out, _ = chay(os.path.join(SC, "hook_usage.py"), c13, "{}")
+    kiem("13 hook: week 93% elapsed", "week 93% elapsed" in out, True)
+    rc, out, _ = chay(os.path.join(SC, "statusline_usage.py"), c13, json.dumps({"rate_limits": {"seven_day": {"used_percentage": 40, "resets_at": now + 43200}}}))
+    kiem("13 status line: 7d time 93%", "7d time 93%" in out, True)
+
+    # 14) tab_title.py
+    TT = os.path.join(SC, "tab_title.py")
+    c14 = os.path.join(goc_tam, "c14")
+    proj = os.path.join(goc_tam, "w14", "05.My app")
+    os.makedirs(os.path.join(proj, "src", "deep"))
+    open(os.path.join(proj, "CLAUDE.md"), "w").write("x")
+    sub14 = os.path.join(proj, "src", "deep")
+
+    def tt(cwd, env_them=None, stdin=None):
+        rc_, o_, _ = chay(TT, c14, json.dumps({"cwd": cwd}) if stdin is None else stdin, env_them=env_them)
+        return rc_, (json.loads(o_)["terminalSequence"] if o_ else "")
+
+    kiem("14 tab: nearest CLAUDE.md folder, number prefix dropped", tt(sub14), (0, "]0;My app"))
+    plain = os.path.join(goc_tam, "w14", "12.Plain")
+    os.makedirs(plain)
+    kiem("14 tab: no marker -> own folder name, prefix dropped", tt(plain), (0, "]0;Plain"))
+    os.makedirs(os.path.join(c14, "usage-tracker"))
+    json.dump({proj: "Custom"}, open(os.path.join(c14, "usage-tracker", "tab-names.json"), "w"))
+    kiem("14 tab: tab-names.json wins", tt(sub14), (0, "]0;Custom"))
+    kiem("14 tab: broken stdin still exits 0 with a name", tt(plain, env_them={"CLAUDE_PROJECT_DIR": plain}, stdin="not json")[0], 0)
+    longp = os.path.join(goc_tam, "w14", "L" * 80)
+    os.makedirs(longp)
+    kiem("14 tab: long name cut to 60", len(tt(longp)[1]) - 5, 60)
+
+    # 15) install --tab-title (opt-in) and a clean uninstall
+    c15 = os.path.join(goc_tam, "c15")
+    os.makedirs(c15)
+    json.dump({"env": {"A": "1"}}, open(os.path.join(c15, "settings.json"), "w", encoding="utf-8"))
+    chay(ins, c15, args=["--tab-title"])
+    chay(ins, c15, args=["--tab-title"])  # twice: no duplicates, usage hook untouched
+    h15 = doc(os.path.join(c15, "settings.json"))["hooks"]
+    cm = lambda ev: [x["command"] for g in h15.get(ev, []) for x in g["hooks"]]
+    kiem("15 --tab-title: SessionStart has tab_title once", (len(cm("SessionStart")), "tab_title.py" in cm("SessionStart")[0]), (1, True))
+    kiem("15 --tab-title: UserPromptSubmit has usage hook + tab hook, no duplicates",
+         sorted("hook_usage" in c for c in cm("UserPromptSubmit")) + [len(cm("UserPromptSubmit"))], [False, True, 2])
+    kiem("15 tab_title.py copied to bin", os.path.exists(os.path.join(c15, "usage-tracker", "bin", "tab_title.py")), True)
+    chay(ins, c15, args=["--uninstall"])
+    kiem("15 uninstall removes tab hooks and file", (doc(os.path.join(c15, "settings.json")), os.path.exists(os.path.join(c15, "usage-tracker", "bin", "tab_title.py"))),
+         ({"env": {"A": "1"}}, False))
+    c16 = os.path.join(goc_tam, "c16")
+    os.makedirs(c16)
+    chay(ins, c16)
+    kiem("15 default install does NOT add tab hooks", "SessionStart" in doc(os.path.join(c16, "settings.json")).get("hooks", {}), False)
+
     dat = sum(1 for _, o in KQ if o)
     if PHA:
         print("TOTAL deliberately-wrong run: caught %d/%d cases" % (len(KQ) - dat, len(KQ)))

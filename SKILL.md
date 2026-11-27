@@ -28,7 +28,7 @@ All output is English. There is no 5-hour field (that limit window no longer exi
 3. Not installed: run `python3 <skill folder>/install.py --dry-run`, show it to the user, then run `install.py` once they agree.
 
 ## 3. Install / uninstall
-`python3 install.py` backs up `settings.json`, copies the scripts to `<config>/usage-tracker/bin/`, adds a `statusLine` (if none exists) and one `UserPromptSubmit` hook group. If another status line exists it is not overwritten; the installer prints how to chain it (`statusline_usage.py --quiet`). Uninstall: `python3 install.py --uninstall`. Details are in `README.md`.
+`python3 install.py` backs up `settings.json`, copies the scripts to `<config>/usage-tracker/bin/`, adds a `statusLine` (if none exists) and one `UserPromptSubmit` hook group. If another status line exists it is not overwritten; the installer prints how to chain it (`statusline_usage.py --quiet`). Optional `--tab-title` also names the terminal tab after the project (`scripts/tab_title.py`). Uninstall: `python3 install.py --uninstall`. Details are in `README.md`.
 
 ## 4. Stop points
 - Do not edit `settings.json` by hand or with any command other than `install.py` (it backs up first and asks before touching what already exists).

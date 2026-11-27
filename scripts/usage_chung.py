@@ -136,13 +136,28 @@ def doc_cache(now):
     return c
 
 
+def het_han(w, now):
+    """True when the stored window has already reset (resets_at in the past): its number belongs to the old week."""
+    r = (w or {}).get("resets")
+    return la_so(r) and r <= now
+
+
+def khong_giam(moi, cu):
+    """Usage never goes down inside one window. If the new reading is LOWER than the stored one for the same
+    window (same resets_at, +-120 s), it is a bad/early reading (e.g. 0% before the first API response): keep the old number.
+    moi / cu = {'pct','resets'} dicts. Returns the dict to store."""
+    try:
+        if moi and cu and la_so(cu.get("pct")) and la_so(moi.get("pct")) and la_so(cu.get("resets"))                 and la_so(moi.get("resets")) and abs(cu["resets"] - moi["resets"]) <= 120 and moi["pct"] < cu["pct"]:
+            return dict(moi, pct=cu["pct"])
+    except Exception:
+        pass
+    return moi
+
+
 def _pct_hien(w, now):
-    """Displayed % of one window; a window that has already reset (resets_at in the past) -> 0."""
-    if not w:
+    """Displayed % of one window. A window that already reset has no valid number -> None (shown as "-"), never 0."""
+    if not w or het_han(w, now):
         return None
-    r = w.get("resets")
-    if la_so(r) and r <= now:
-        return 0.0
     return w.get("pct")
 
 
@@ -199,7 +214,7 @@ def dong_ngan(rate, cache, now):
         parts.append("7d Fable usage ~%d%%" % cache["fable_uoc"])
     elif cache and cache.get("fable_ty_le") is not None:
         parts.append("7d Fable usage %d%%" % cache["fable_ty_le"])
-    parts.append("7d usage %s" % p(d7))
+    parts.append("7d usage %s" % (p(d7) if d7 is not None or not het_han(d7w, now) else "- (STALE)"))
     tg = phan_tram_tuan_troi((d7w or {}).get("resets"), now)
     if tg is not None:
         parts.append("7d time %d%%" % tg)

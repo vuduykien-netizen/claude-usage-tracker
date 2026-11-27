@@ -59,7 +59,7 @@ def chay(quiet):
             return w
         return None
 
-    rate = {"t": int(now), "seven_day": giu(d7, "seven_day"), "khac": khac}
+    rate = {"t": int(now), "seven_day": uc.khong_giam(giu(d7, "seven_day"), cu.get("seven_day")), "khac": khac}
     uc.ghi_tep(os.path.join(uc.thu_muc_du_lieu(), "rate.json"), json.dumps(rate, ensure_ascii=True))
     uc.lam_moi_nen(now)
     if not quiet:

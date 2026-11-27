@@ -5,6 +5,7 @@
   python3 install.py --dry-run     only print what would be done, write nothing
   python3 install.py --uninstall   remove: delete only the entries it added and the bin files the skill created; keep the data and the config directory
   python3 install.py --config-dir <dir>   (default: CLAUDE_CONFIG_DIR or ~/.claude)
+  python3 install.py --tab-title   also name the terminal tab after the project (scripts/tab_title.py, SessionStart + UserPromptSubmit hooks); opt-in
 
 Safety:
 - Backs up settings.json before editing (settings.json.usage-tracker.<time>.bak).
@@ -21,6 +22,8 @@ import time
 
 GOC = os.path.dirname(os.path.abspath(__file__))
 TEP_SCRIPT = ("usage_chung.py", "statusline_usage.py", "nhip_tuan.py", "hook_usage.py")
+TAB = "tab_title.py"  # opt-in: --tab-title
+TAB_SU_KIEN = ("SessionStart", "UserPromptSubmit")
 DAU = "usage-tracker"  # marker used to recognise the entries this skill added
 
 
@@ -100,7 +103,7 @@ def cai(cfg, dry):
     da = False
     for nhom in ds:
         for h in (nhom.get("hooks") if isinstance(nhom, dict) else None) or []:
-            if isinstance(h, dict) and la_cua_ta(h.get("command")):
+            if isinstance(h, dict) and la_cua_ta(h.get("command")) and "hook_usage" in h["command"]:
                 h["command"] = lenh_hk
                 da = True
     if not da:
@@ -108,14 +111,32 @@ def cai(cfg, dry):
         kq.append("hook UserPromptSubmit: added a new group (kept %d existing groups)" % (len(ds) - 1))
     else:
         kq.append("hook UserPromptSubmit: updated the skill's own entry")
-    kq.append("copy %d files to %s" % (len(TEP_SCRIPT), bin_dir))
+    tep_cai = TEP_SCRIPT
+    if "--tab-title" in sys.argv[1:]:
+        lenh_tab = lenh(py, os.path.join(bin_dir, TAB))
+        tep_cai = TEP_SCRIPT + (TAB,)
+        for sk in TAB_SU_KIEN:
+            dsk = hooks.setdefault(sk, [])
+            if not isinstance(dsk, list):
+                print("STOP: hooks.%s is not a list. Nothing written." % sk)
+                return 2
+            co = False
+            for nhom in dsk:
+                for h in (nhom.get("hooks") if isinstance(nhom, dict) else None) or []:
+                    if isinstance(h, dict) and isinstance(h.get("command"), str) and TAB in h["command"] and la_cua_ta(h["command"]):
+                        h["command"] = lenh_tab
+                        co = True
+            if not co:
+                dsk.append({"hooks": [{"type": "command", "command": lenh_tab}]})
+        kq.append("tab title: hooks %s -> %s" % ("+".join(TAB_SU_KIEN), TAB))
+    kq.append("copy %d files to %s" % (len(tep_cai), bin_dir))
     if dry:
         print("[dry-run] nothing written. Would do:")
         for d in kq:
             print(" -", d)
         return 0
     os.makedirs(bin_dir, exist_ok=True)
-    for t in TEP_SCRIPT:
+    for t in tep_cai:
         shutil.copyfile(os.path.join(GOC, "scripts", t), os.path.join(bin_dir, t))
     if os.path.exists(sp):
         bak = "%s.usage-tracker.%s.bak" % (sp, time.strftime("%Y%m%d-%H%M%S"))
@@ -143,26 +164,27 @@ def go(cfg, dry):
         del st["statusLine"]
         kq.append("removed the skill's statusLine")
     hooks = st.get("hooks")
-    ds = hooks.get("UserPromptSubmit") if isinstance(hooks, dict) else None
-    if isinstance(ds, list):
-        moi = []
-        for nhom in ds:
-            hs = nhom.get("hooks") if isinstance(nhom, dict) else None
-            if isinstance(hs, list):
-                con = [h for h in hs if not (isinstance(h, dict) and la_cua_ta(h.get("command")))]
-                if len(con) != len(hs):
-                    kq.append("removed the skill's hook")
-                    if not con and set(nhom.keys()) <= {"hooks", "matcher"}:
-                        continue
-                    nhom["hooks"] = con
-            moi.append(nhom)
-        if moi:
-            hooks["UserPromptSubmit"] = moi
-        elif ds:
-            del hooks["UserPromptSubmit"]
-            if not hooks:
-                del st["hooks"]
-    tep_xoa = [os.path.join(bin_dir, t) for t in TEP_SCRIPT + ("lang_vi.py",) if os.path.exists(os.path.join(bin_dir, t))]
+    for sk in ("UserPromptSubmit",) + TAB_SU_KIEN[:1]:
+        ds = hooks.get(sk) if isinstance(hooks, dict) else None
+        if isinstance(ds, list):
+            moi = []
+            for nhom in ds:
+                hs = nhom.get("hooks") if isinstance(nhom, dict) else None
+                if isinstance(hs, list):
+                    con = [h for h in hs if not (isinstance(h, dict) and la_cua_ta(h.get("command")))]
+                    if len(con) != len(hs):
+                        kq.append("removed the skill's hook (%s)" % sk)
+                        if not con and set(nhom.keys()) <= {"hooks", "matcher"}:
+                            continue
+                        nhom["hooks"] = con
+                moi.append(nhom)
+            if moi:
+                hooks[sk] = moi
+            elif ds:
+                del hooks[sk]
+    if isinstance(hooks, dict) and not hooks:
+        del st["hooks"]
+    tep_xoa = [os.path.join(bin_dir, t) for t in TEP_SCRIPT + (TAB, "lang_vi.py") if os.path.exists(os.path.join(bin_dir, t))]
     kq.append("delete %d bin files created by the skill (keeping the data rate.json, moc.jsonl and the config directory)" % len(tep_xoa))
     if dry:
         print("[dry-run] nothing written. Would do:")
